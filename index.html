@@ -17,7 +17,7 @@
 <body>
     <div class="box">
         <h2>National Request Playlist Generator</h2>
-        <div class="status" id="loadStatus">Loading Data...</div>
+        <div class="status" id="loadStatus">Loading...</div>
         
         <button id="genBtn" onclick="generatePlaylist()" disabled>Generate 1-Hour Playlist</button>
         
@@ -37,29 +37,34 @@
         const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSZf2oqinMZWPB0z9dXTfbQxsuzssny4BV5-htEB-udb0quC7a0T8W-uXHbVcF8HycL4h_XBKveNVNm/pub?gid=984873385&single=true&output=csv';
         let libraryData = [];
 
+        // This cleans the gender column ONLY
+        function cleanGender(val) {
+            if (!val) return "";
+            // Remove anything that looks like [DD/MM/YYYY HH:MM]
+            return val.replace(/\d{1,2}\/\d{1,2}\/\d{2,4}\s\d{1,2}:\d{2}/g, "").trim();
+        }
+
         async function fetchLibrary() {
             try {
-                // Using a timestamp to ensure the data is fresh from Google
                 const response = await fetch(SHEET_URL + "&cb=" + Date.now());
                 const csvText = await response.text();
                 const lines = csvText.split(/\r?\n/).slice(1);
                 
                 libraryData = lines.map(line => {
                     let cols = line.split(',');
-                    // Original column mapping: 0=ID, 1=Artist, 2=Title, 3=Cat, 5=Gender
                     if (cols.length >= 6) {
                         return {
                             pos: cols[0].trim(),
                             artist: cols[1].trim(),
                             title: cols[2].trim(),
                             cat: cols[3].trim().toUpperCase(),
-                            gender: cols[5].trim().toUpperCase()
+                            gender: cleanGender(cols[5]) // Clean the gender column here
                         };
                     }
                     return null;
                 }).filter(row => row !== null && row.artist !== "");
                 
-                document.getElementById('loadStatus').innerHTML = `Library Online: ${libraryData.length} songs synced.`;
+                document.getElementById('loadStatus').innerHTML = `Ready: ${libraryData.length} songs.`;
                 document.getElementById('genBtn').disabled = false;
             } catch (err) {
                 document.getElementById('loadStatus').innerHTML = "Connection Error.";
@@ -71,7 +76,6 @@
             let playlist = [];
             let usedArtists = new Set();
 
-            // Simple 18-slot generation
             for (let slot = 1; slot <= 18; slot++) {
                 let category = pattern[(slot - 1) % 4];
                 let pool = libraryData.filter(r => r.cat === category && !usedArtists.has(r.artist));
@@ -96,7 +100,7 @@
             let generatedText = "--- NATIONAL REQUEST PLAYLIST ---\n\n";
             list.forEach(s => {
                 let status = s.slot <= 14 ? "[STRICT]  " : "[OPTIONAL]";
-                // Reverted formatting with the "Chart Position" request
+                // Re-added the Gender bracket correctly
                 generatedText += `${s.slot.toString().padStart(2, '0')}. ${status} [${s.cat}] [${s.gender}] ${s.artist} - ${s.title} (Chart Position: #${s.pos})\n`;
             });
 
