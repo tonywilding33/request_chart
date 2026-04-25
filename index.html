@@ -2,22 +2,22 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>National Request Playlist Generator</title>
+    <title>National Request Generator v11.0</title>
     <style>
         body { font-family: sans-serif; max-width: 800px; margin: 20px auto; line-height: 1.6; padding: 20px; background: #f4f4f9; }
-        .box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #3498db; }
-        .status { font-size: 0.9em; color: #7f8c8d; margin-bottom: 20px; padding: 10px; background: #ebf5fb; border-radius: 4px; }
+        .box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #d35400; }
+        .status { font-size: 0.9em; color: #7f8c8d; margin-bottom: 20px; padding: 10px; background: #fdf2e9; border-radius: 4px; border: 1px solid #d35400; }
         h2 { color: #2c3e50; margin-top: 0; }
-        button { background: #27ae60; color: white; border: none; padding: 12px 24px; border-radius: 4px; cursor: pointer; font-size: 1em; font-weight: bold; }
+        button { background: #d35400; color: white; border: none; padding: 12px 24px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         button:disabled { background: #bdc3c7; }
         pre { background: #2c3e50; color: #ecf0f1; padding: 20px; border-radius: 4px; font-size: 0.95em; white-space: pre-wrap; }
-        footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #ddd; font-size: 0.85em; color: #7f8c8d; text-align: center; }
+        footer { margin-top: 30px; font-size: 0.85em; color: #7f8c8d; text-align: center; border-top: 1px solid #ddd; padding-top: 10px; }
     </style>
 </head>
 <body>
     <div class="box">
-        <h2>National Request Playlist Generator</h2>
-        <div class="status" id="loadStatus">Loading Data...</div>
+        <h2>National Request Generator <small style="font-size: 0.5em; color: #d35400;">(v11.0 - AUTO-SHIFT)</small></h2>
+        <div class="status" id="loadStatus">Analyzing Spreadsheet Layout...</div>
         
         <button id="genBtn" onclick="generatePlaylist()" disabled>Generate 1-Hour Playlist</button>
         
@@ -39,25 +39,28 @@
 
         async function fetchLibrary() {
             try {
-                const response = await fetch(SHEET_URL + "&cb=" + Date.now());
+                const response = await fetch(SHEET_URL + "&cache=" + Date.now());
                 const csvText = await response.text();
                 const lines = csvText.split(/\r?\n/).slice(1);
                 
                 libraryData = lines.map(line => {
                     let cols = line.split(',');
-                    if (cols.length >= 7) {
-                        return {
-                            pos: cols[0].trim(),      // Column 0: Chart Position
-                            artist: cols[1].trim(),   // Column 1: Artist
-                            title: cols[2].trim(),    // Column 2: Title
-                            cat: cols[3].trim().toUpperCase(), // Column 3: Category (A, B, C)
-                            gender: cols[5].trim().toUpperCase() // Column 5: Gender
-                        };
-                    }
-                    return null;
+                    if (cols.length < 5) return null;
+
+                    // CHECK FOR SHIFT: Is the first column a date (contains / and :)?
+                    // If yes, we offset all column counts by +1
+                    let offset = (cols[0].includes('/') && cols[0].includes(':')) ? 1 : 0;
+
+                    return {
+                        pos: cols[0 + offset].trim(),    // ID
+                        artist: cols[1 + offset].trim(), // Artist
+                        title: cols[2 + offset].trim(),  // Title
+                        cat: cols[3 + offset].trim().toUpperCase(), // Category (A/B/C)
+                        gender: cols[5 + offset] ? cols[5 + offset].trim().toUpperCase() : "U"
+                    };
                 }).filter(row => row !== null && row.artist !== "");
                 
-                document.getElementById('loadStatus').innerHTML = `Library Ready: ${libraryData.length} songs.`;
+                document.getElementById('loadStatus').innerHTML = `v11.0 Online: ${libraryData.length} songs synced.`;
                 document.getElementById('genBtn').disabled = false;
             } catch (err) {
                 document.getElementById('loadStatus').innerHTML = "Database Connection Error.";
@@ -79,30 +82,25 @@
                     usedArtists.add(pick.artist);
                 }
             }
-            displayPlaylist(playlist);
+            display(playlist);
         }
 
-        function displayPlaylist(list) {
-            let generatedText = "--- NATIONAL REQUEST PLAYLIST ---\n\n";
+        function display(list) {
+            let out = "--- NATIONAL REQUEST PLAYLIST ---\n\n";
             list.forEach(s => {
                 let status = s.slot <= 14 ? "[STRICT]  " : "[OPTIONAL]";
-                // This line specifically uses the Category [A/B/C] and the label Chart Position
-                generatedText += `${s.slot.toString().padStart(2, '0')}. ${status} [${s.cat}] [${s.gender}] ${s.artist} - ${s.title} (Chart Position: #${s.pos})\n`;
+                out += `${s.slot.toString().padStart(2, '0')}. ${status} [${s.cat}] [${s.gender}] ${s.artist} - ${s.title} (Chart Position: #${s.pos})\n`;
             });
-
-            document.getElementById('playlistDisplay').innerText = generatedText;
+            document.getElementById('playlistDisplay').innerText = out;
             document.getElementById('outputArea').style.display = 'block';
-            window.scrollTo(0, document.body.scrollHeight);
         }
 
         function downloadTxt() {
-            const text = document.getElementById('playlistDisplay').innerText;
-            const element = document.createElement("a");
-            const file = new Blob([text], {type: 'text/plain'});
-            element.href = URL.createObjectURL(file);
-            element.download = "PlayList.txt";
-            document.body.appendChild(element);
-            element.click();
+            const blob = new Blob([document.getElementById('playlistDisplay').innerText], {type: 'text/plain'});
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "PlayList.txt";
+            a.click();
         }
 
         fetchLibrary();
