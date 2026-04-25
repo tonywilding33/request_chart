@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>National Request Generator v8.0</title>
+    <title>National Request Generator v9.0</title>
     <style>
         body { font-family: sans-serif; max-width: 800px; margin: 20px auto; line-height: 1.6; padding: 20px; background: #f4f4f9; }
-        .box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #34495e; }
-        .status { font-size: 0.9em; color: #7f8c8d; margin-bottom: 20px; padding: 10px; background: #ebedef; border-radius: 4px; border: 1px solid #34495e; }
+        .box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #000; }
+        .status { font-size: 0.9em; color: #7f8c8d; margin-bottom: 20px; padding: 10px; background: #eee; border-radius: 4px; border: 1px solid #000; }
         h2 { color: #2c3e50; margin-top: 0; }
-        button { background: #34495e; color: white; border: none; padding: 12px 24px; border-radius: 4px; cursor: pointer; font-size: 1em; font-weight: bold; }
+        button { background: #000; color: white; border: none; padding: 12px 24px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         button:disabled { background: #bdc3c7; }
         pre { background: #2c3e50; color: #ecf0f1; padding: 20px; border-radius: 4px; font-size: 0.95em; white-space: pre-wrap; }
         footer { margin-top: 30px; font-size: 0.85em; color: #7f8c8d; text-align: center; border-top: 1px solid #ddd; padding-top: 10px; }
@@ -16,7 +16,7 @@
 </head>
 <body>
     <div class="box">
-        <h2>National Request Generator <small style="font-size: 0.5em; color: #34495e;">(v8.0 - GLOBAL REPLACE)</small></h2>
+        <h2>National Request Generator <small style="font-size: 0.5em; color: #000;">(v9.0 - HARD RESET)</small></h2>
         <div class="status" id="loadStatus">Awaiting Data...</div>
         
         <button id="genBtn" onclick="generatePlaylist()" disabled>Generate Clean Playlist</button>
@@ -37,18 +37,21 @@
         const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSZf2oqinMZWPB0z9dXTfbQxsuzssny4BV5-htEB-udb0quC7a0T8W-uXHbVcF8HycL4h_XBKveNVNm/pub?gid=984873385&single=true&output=csv';
         let libraryData = [];
 
-        // v8.0 Cleaner: A "Search and Destroy" for anything matching a date/time pattern
-        function globalClean(text) {
-            if (!text) return "";
-            // This regex specifically finds [Anything with a / and a :]
-            // It is case-insensitive and global.
-            return text.replace(/\[\d{1,2}\/\d{1,2}\/\d{2,4}\s\d{1,2}:\d{2}\]/g, "").trim();
+        // v9.0 Scrubber: The "Index Cut"
+        function hardClean(val) {
+            if (!val) return "";
+            let s = val.trim();
+            // If the cell contains a bracket, cut everything up to the LAST closing bracket found in the raw data
+            if (s.includes(']')) {
+                s = s.substring(s.lastIndexOf(']') + 1).trim();
+            }
+            // Remove any leftover leading quotes if CSV is messy
+            return s.replace(/^"+|"+$/g, '').trim();
         }
 
         async function fetchLibrary() {
             try {
-                // cache-busting timestamp
-                const response = await fetch(SHEET_URL + "&nocache=" + new Date().getTime());
+                const response = await fetch(SHEET_URL + "&t=" + new Date().getTime());
                 const csvText = await response.text();
                 const lines = csvText.split(/\r?\n/).slice(1);
                 
@@ -57,8 +60,8 @@
                     if (cols.length >= 7) {
                         return {
                             pos: cols[0].trim(),
-                            artist: globalClean(cols[1]),
-                            title: globalClean(cols[2]),
+                            artist: hardClean(cols[1]),
+                            title: hardClean(cols[2]),
                             cat: cols[3].trim().toUpperCase(),
                             gender: cols[5].trim().toUpperCase()
                         };
@@ -66,10 +69,10 @@
                     return null;
                 }).filter(row => row !== null && row.artist !== "");
                 
-                document.getElementById('loadStatus').innerHTML = `v8.0 Online: ${libraryData.length} entries.`;
+                document.getElementById('loadStatus').innerHTML = `v9.0 Active: ${libraryData.length} records.`;
                 document.getElementById('genBtn').disabled = false;
             } catch (err) {
-                document.getElementById('loadStatus').innerHTML = "Database Error.";
+                document.getElementById('loadStatus').innerHTML = "Database Connection Error.";
             }
         }
 
@@ -88,14 +91,14 @@
                     usedArtists.add(pick.artist);
                 }
             }
-            display(playlist);
+            render(playlist);
         }
 
-        function display(list) {
+        function render(list) {
             let out = "--- NATIONAL REQUEST PLAYLIST ---\n\n";
             list.forEach(s => {
                 let status = s.slot <= 14 ? "[STRICT]  " : "[OPTIONAL]";
-                // Category and Gender tags are generated here, NOT from the column
+                // [cat] and [gender] are added fresh here
                 out += `${s.slot.toString().padStart(2, '0')}. ${status} [${s.cat}] [${s.gender}] ${s.artist} - ${s.title} (Chart Position: #${s.pos})\n`;
             });
             document.getElementById('playlistDisplay').innerText = out;
@@ -106,7 +109,7 @@
             const blob = new Blob([document.getElementById('playlistDisplay').innerText], {type: 'text/plain'});
             const a = document.createElement("a");
             a.href = URL.createObjectURL(blob);
-            a.download = "NationalPlaylist.txt";
+            a.download = "Playlist.txt";
             a.click();
         }
 
