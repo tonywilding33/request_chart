@@ -8,25 +8,23 @@
         .box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #3498db; }
         .status { font-size: 0.9em; color: #7f8c8d; margin-bottom: 20px; padding: 10px; background: #ebf5fb; border-radius: 4px; }
         h2 { color: #2c3e50; margin-top: 0; }
-        button { background: #27ae60; color: white; border: none; padding: 12px 24px; border-radius: 4px; cursor: pointer; font-size: 1em; font-weight: bold; transition: 0.2s; }
-        button:hover { background: #219150; transform: translateY(-1px); }
-        button:disabled { background: #bdc3c7; cursor: not-allowed; }
-        pre { background: #2c3e50; color: #ecf0f1; padding: 20px; overflow-x: auto; border-radius: 4px; font-size: 0.95em; white-space: pre-wrap; line-height: 1.4; }
-        .download-btn { background: #3498db; margin-top: 15px; }
-        footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #ddd; font-size: 0.85em; color: #7f8c8d; text-align: center; line-height: 1.5; }
+        button { background: #27ae60; color: white; border: none; padding: 12px 24px; border-radius: 4px; cursor: pointer; font-size: 1em; font-weight: bold; }
+        button:disabled { background: #bdc3c7; }
+        pre { background: #2c3e50; color: #ecf0f1; padding: 20px; border-radius: 4px; font-size: 0.95em; white-space: pre-wrap; }
+        footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #ddd; font-size: 0.85em; color: #7f8c8d; text-align: center; }
     </style>
 </head>
 <body>
     <div class="box">
         <h2>National Request Playlist Generator</h2>
-        <div class="status" id="loadStatus">Connecting to Database...</div>
+        <div class="status" id="loadStatus">Loading Data...</div>
         
         <button id="genBtn" onclick="generatePlaylist()" disabled>Generate 1-Hour Playlist</button>
         
         <div id="outputArea" style="display:none;">
             <h3>Generated Playlist</h3>
             <pre id="playlistDisplay"></pre>
-            <button class="download-btn" onclick="downloadTxt()">Download PlayList.txt</button>
+            <button style="background:#3498db; color:white; border:none; padding:10px; cursor:pointer;" onclick="downloadTxt()">Download PlayList.txt</button>
         </div>
 
         <footer>
@@ -39,12 +37,6 @@
         const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSZf2oqinMZWPB0z9dXTfbQxsuzssny4BV5-htEB-udb0quC7a0T8W-uXHbVcF8HycL4h_XBKveNVNm/pub?gid=984873385&single=true&output=csv';
         let libraryData = [];
 
-        // Scrubber to remove any bracketed data like [24/04/2026 23:30]
-        function universalScrub(str) {
-            if (!str) return "";
-            return str.replace(/\[.*?\]/g, "").replace(/\s\s+/g, ' ').trim();
-        }
-
         async function fetchLibrary() {
             try {
                 const response = await fetch(SHEET_URL + "&cb=" + Date.now());
@@ -55,21 +47,20 @@
                     let cols = line.split(',');
                     if (cols.length >= 7) {
                         return {
-                            pos: cols[0].trim(),
-                            artist: universalScrub(cols[1]),
-                            title: universalScrub(cols[2]),
-                            cat: cols[3].trim().toUpperCase(),
-                            gender: cols[5].trim().toUpperCase(),
-                            score: parseFloat(cols[6]) || 1
+                            pos: cols[0].trim(),      // Column 0: Chart Position
+                            artist: cols[1].trim(),   // Column 1: Artist
+                            title: cols[2].trim(),    // Column 2: Title
+                            cat: cols[3].trim().toUpperCase(), // Column 3: Category (A, B, C)
+                            gender: cols[5].trim().toUpperCase() // Column 5: Gender
                         };
                     }
                     return null;
                 }).filter(row => row !== null && row.artist !== "");
                 
-                document.getElementById('loadStatus').innerHTML = `Library Online: ${libraryData.length} songs synced.`;
+                document.getElementById('loadStatus').innerHTML = `Library Ready: ${libraryData.length} songs.`;
                 document.getElementById('genBtn').disabled = false;
             } catch (err) {
-                document.getElementById('loadStatus').innerHTML = "Error connecting to database.";
+                document.getElementById('loadStatus').innerHTML = "Database Connection Error.";
             }
         }
 
@@ -80,33 +71,11 @@
 
             for (let slot = 1; slot <= 18; slot++) {
                 let category = pattern[(slot - 1) % 4];
-                
-                let pool = libraryData.filter(r => 
-                    r.cat === category && !usedArtists.has(r.artist)
-                );
+                let pool = libraryData.filter(r => r.cat === category && !usedArtists.has(r.artist));
                 
                 if (pool.length > 0) {
-                    // Weighted Selection (Using Score)
-                    let totalScore = pool.reduce((sum, r) => sum + r.score, 0);
-                    let threshold = Math.random() * totalScore;
-                    let runningSum = 0;
-                    let pick = pool[0];
-
-                    for (let song of pool) {
-                        runningSum += song.score;
-                        if (runningSum >= threshold) {
-                            pick = song;
-                            break;
-                        }
-                    }
-
-                    playlist.push({
-                        slot: slot,
-                        pos: pick.pos,
-                        artist: pick.artist,
-                        title: pick.title,
-                        gender: pick.gender
-                    });
+                    let pick = pool[Math.floor(Math.random() * pool.length)];
+                    playlist.push({ slot: slot, ...pick });
                     usedArtists.add(pick.artist);
                 }
             }
@@ -117,7 +86,8 @@
             let generatedText = "--- NATIONAL REQUEST PLAYLIST ---\n\n";
             list.forEach(s => {
                 let status = s.slot <= 14 ? "[STRICT]  " : "[OPTIONAL]";
-                generatedText += `${s.slot.toString().padStart(2, '0')}. ${status} [${s.gender}] ${s.artist} - ${s.title} (Chart Position: #${s.pos})\n`;
+                // This line specifically uses the Category [A/B/C] and the label Chart Position
+                generatedText += `${s.slot.toString().padStart(2, '0')}. ${status} [${s.cat}] [${s.gender}] ${s.artist} - ${s.title} (Chart Position: #${s.pos})\n`;
             });
 
             document.getElementById('playlistDisplay').innerText = generatedText;
