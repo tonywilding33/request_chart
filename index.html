@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>National Request Generator v4.0</title>
+    <title>National Request Generator v5.0</title>
     <style>
         body { font-family: sans-serif; max-width: 800px; margin: 20px auto; line-height: 1.6; padding: 20px; background: #f4f4f9; }
-        .box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #e74c3c; }
-        .status { font-size: 0.9em; color: #7f8c8d; margin-bottom: 20px; padding: 10px; background: #fdf2f2; border-radius: 4px; border: 1px solid #fab1a0; }
+        .box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #8e44ad; }
+        .status { font-size: 0.9em; color: #7f8c8d; margin-bottom: 20px; padding: 10px; background: #f4ecf7; border-radius: 4px; border: 1px solid #d2b4de; }
         h2 { color: #2c3e50; margin-top: 0; }
-        button { background: #e74c3c; color: white; border: none; padding: 12px 24px; border-radius: 4px; cursor: pointer; font-size: 1em; font-weight: bold; }
+        button { background: #8e44ad; color: white; border: none; padding: 12px 24px; border-radius: 4px; cursor: pointer; font-size: 1em; font-weight: bold; }
         button:disabled { background: #bdc3c7; }
         pre { background: #2c3e50; color: #ecf0f1; padding: 20px; border-radius: 4px; font-size: 0.95em; white-space: pre-wrap; }
         footer { margin-top: 30px; font-size: 0.85em; color: #7f8c8d; text-align: center; border-top: 1px solid #ddd; padding-top: 10px; }
@@ -16,10 +16,10 @@
 </head>
 <body>
     <div class="box">
-        <h2>National Request Generator <small style="font-size: 0.5em; color: #e74c3c;">(v4.0 - BRUTE FORCE)</small></h2>
-        <div class="status" id="loadStatus">Waiting for Database...</div>
+        <h2>National Request Generator <small style="font-size: 0.5em; color: #8e44ad;">(v5.0 - TOTAL WIPEOUT)</small></h2>
+        <div class="status" id="loadStatus">Awaiting Data...</div>
         
-        <button id="genBtn" onclick="generatePlaylist()" disabled>Generate 1-Hour Playlist</button>
+        <button id="genBtn" onclick="generatePlaylist()" disabled>Generate Clean Playlist</button>
         
         <div id="outputArea" style="display:none;">
             <h3>Generated Playlist</h3>
@@ -37,17 +37,13 @@
         const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSZf2oqinMZWPB0z9dXTfbQxsuzssny4BV5-htEB-udb0quC7a0T8W-uXHbVcF8HycL4h_XBKveNVNm/pub?gid=984873385&single=true&output=csv';
         let libraryData = [];
 
-        // The "Nuke" Scrubber: Targets brackets, slashes, and colons in one go
-        function nukeDate(text) {
+        // v5.0 Cleaner: Finds the first letter/number and kills EVERYTHING before it.
+        function totalWipeout(text) {
             if (!text) return "";
-            // 1. Remove anything in [ ]
-            let clean = text.replace(/\[.*?\]/g, "");
-            // 2. Remove anything that looks like a date (00/00/0000)
-            clean = clean.replace(/\d{1,2}\/\d{1,2}\/\d{2,4}/g, "");
-            // 3. Remove anything that looks like a time (00:00)
-            clean = clean.replace(/\d{1,2}:\d{2}/g, "");
-            // 4. Clean up any weird symbols or double spaces left behind
-            return clean.replace(/[^\w\s\-\&\(\)\'\.]/g, " ").replace(/\s\s+/g, ' ').trim();
+            // This looks for the first "real" character (A-Z or 0-9) 
+            // and throws away everything (brackets, dates, symbols) that appears before it.
+            let match = text.match(/[a-zA-Z0-9].*/);
+            return match ? match[0].trim() : text.trim();
         }
 
         async function fetchLibrary() {
@@ -61,20 +57,19 @@
                     if (cols.length >= 7) {
                         return {
                             pos: cols[0].trim(),
-                            artist: nukeDate(cols[1]),
-                            title: nukeDate(cols[2]),
+                            artist: totalWipeout(cols[1]), // Nukes the date prefix
+                            title: totalWipeout(cols[2]),  // Nukes the date prefix
                             cat: cols[3].trim().toUpperCase(),
-                            gender: cols[5].trim().toUpperCase(),
-                            score: parseFloat(cols[6]) || 1
+                            gender: cols[5].trim().toUpperCase()
                         };
                     }
                     return null;
                 }).filter(row => row !== null && row.artist !== "");
                 
-                document.getElementById('loadStatus').innerHTML = `v4.0 Online: ${libraryData.length} Clean Songs Ready.`;
+                document.getElementById('loadStatus').innerHTML = `v5.0 Ready: ${libraryData.length} songs imported.`;
                 document.getElementById('genBtn').disabled = false;
             } catch (err) {
-                document.getElementById('loadStatus').innerHTML = "Connection Error.";
+                document.getElementById('loadStatus').innerHTML = "Sync Error.";
             }
         }
 
@@ -82,31 +77,15 @@
             const pattern = ["A", "B", "A", "C"];
             let playlist = [];
             let usedArtists = new Set();
-            let lastGender = "";
 
             for (let slot = 1; slot <= 18; slot++) {
                 let category = pattern[(slot - 1) % 4];
                 let pool = libraryData.filter(r => r.cat === category && !usedArtists.has(r.artist));
                 
-                // Keep the gender balance but make it a soft rule to avoid empty pools
-                let genderPool = pool.filter(r => r.gender !== lastGender);
-                let finalPool = genderPool.length > 0 ? genderPool : pool;
-
-                if (finalPool.length > 0) {
-                    // Weighted random
-                    let total = finalPool.reduce((sum, r) => sum + r.score, 0);
-                    let threshold = Math.random() * total;
-                    let runningSum = 0;
-                    let pick = finalPool[0];
-
-                    for (let s of finalPool) {
-                        runningSum += s.score;
-                        if (runningSum >= threshold) { pick = s; break; }
-                    }
-
+                if (pool.length > 0) {
+                    let pick = pool[Math.floor(Math.random() * pool.length)];
                     playlist.push({ slot: slot, ...pick });
                     usedArtists.add(pick.artist);
-                    lastGender = pick.gender;
                 }
             }
             display(playlist);
@@ -126,7 +105,7 @@
             const blob = new Blob([document.getElementById('playlistDisplay').innerText], {type: 'text/plain'});
             const a = document.createElement("a");
             a.href = URL.createObjectURL(blob);
-            a.download = "National_Playlist_v4.txt";
+            a.download = "National_Playlist.txt";
             a.click();
         }
 
