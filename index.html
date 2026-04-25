@@ -5,8 +5,8 @@
     <title>National Request Playlist Generator</title>
     <style>
         body { font-family: sans-serif; max-width: 800px; margin: 20px auto; line-height: 1.6; padding: 20px; background: #f4f4f9; }
-        .box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #3498db; }
-        .status { font-size: 0.9em; color: #7f8c8d; margin-bottom: 20px; padding: 10px; background: #ebf5fb; border-radius: 4px; }
+        .box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #e74c3c; }
+        .status { font-size: 0.9em; color: #7f8c8d; margin-bottom: 20px; padding: 10px; background: #fdf2f2; border-radius: 4px; border: 1px solid #fab1a0; }
         h2 { color: #2c3e50; margin-top: 0; }
         button { background: #27ae60; color: white; border: none; padding: 12px 24px; border-radius: 4px; cursor: pointer; font-size: 1em; font-weight: bold; }
         button:disabled { background: #bdc3c7; }
@@ -16,8 +16,8 @@
 </head>
 <body>
     <div class="box">
-        <h2>National Request Playlist Generator</h2>
-        <div class="status" id="loadStatus">Loading...</div>
+        <h2>National Request Generator</h2>
+        <div class="status" id="loadStatus">Checking Data...</div>
         
         <button id="genBtn" onclick="generatePlaylist()" disabled>Generate 1-Hour Playlist</button>
         
@@ -37,11 +37,10 @@
         const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSZf2oqinMZWPB0z9dXTfbQxsuzssny4BV5-htEB-udb0quC7a0T8W-uXHbVcF8HycL4h_XBKveNVNm/pub?gid=984873385&single=true&output=csv';
         let libraryData = [];
 
-        // This cleans the gender column ONLY
-        function cleanGender(val) {
-            if (!val) return "";
-            // Remove anything that looks like [DD/MM/YYYY HH:MM]
-            return val.replace(/\d{1,2}\/\d{1,2}\/\d{2,4}\s\d{1,2}:\d{2}/g, "").trim();
+        // This removes [ANYTHING IN BRACKETS] from a piece of text
+        function stripBrackets(str) {
+            if (!str) return "";
+            return str.replace(/\[.*?\]/g, "").trim();
         }
 
         async function fetchLibrary() {
@@ -55,16 +54,17 @@
                     if (cols.length >= 6) {
                         return {
                             pos: cols[0].trim(),
-                            artist: cols[1].trim(),
-                            title: cols[2].trim(),
+                            // We clean the artist and title here specifically
+                            artist: stripBrackets(cols[1]),
+                            title: stripBrackets(cols[2]),
                             cat: cols[3].trim().toUpperCase(),
-                            gender: cleanGender(cols[5]) // Clean the gender column here
+                            gender: stripBrackets(cols[5]) 
                         };
                     }
                     return null;
                 }).filter(row => row !== null && row.artist !== "");
                 
-                document.getElementById('loadStatus').innerHTML = `Ready: ${libraryData.length} songs.`;
+                document.getElementById('loadStatus').innerHTML = `Ready: ${libraryData.length} Cleaned Songs.`;
                 document.getElementById('genBtn').disabled = false;
             } catch (err) {
                 document.getElementById('loadStatus').innerHTML = "Connection Error.";
@@ -82,40 +82,30 @@
                 
                 if (pool.length > 0) {
                     let pick = pool[Math.floor(Math.random() * pool.length)];
-                    playlist.push({
-                        slot: slot,
-                        pos: pick.pos,
-                        artist: pick.artist,
-                        title: pick.title,
-                        cat: pick.cat,
-                        gender: pick.gender
-                    });
+                    playlist.push({ slot: slot, ...pick });
                     usedArtists.add(pick.artist);
                 }
             }
-            displayPlaylist(playlist);
+            display(playlist);
         }
 
-        function displayPlaylist(list) {
-            let generatedText = "--- NATIONAL REQUEST PLAYLIST ---\n\n";
+        function display(list) {
+            let out = "--- NATIONAL REQUEST PLAYLIST ---\n\n";
             list.forEach(s => {
                 let status = s.slot <= 14 ? "[STRICT]  " : "[OPTIONAL]";
-                // Re-added the Gender bracket correctly
-                generatedText += `${s.slot.toString().padStart(2, '0')}. ${status} [${s.cat}] [${s.gender}] ${s.artist} - ${s.title} (Chart Position: #${s.pos})\n`;
+                // Re-assembling with Category, Gender, and Chart Position
+                out += `${s.slot.toString().padStart(2, '0')}. ${status} [${s.cat}] [${s.gender}] ${s.artist} - ${s.title} (Chart Position: #${s.pos})\n`;
             });
-
-            document.getElementById('playlistDisplay').innerText = generatedText;
+            document.getElementById('playlistDisplay').innerText = out;
             document.getElementById('outputArea').style.display = 'block';
         }
 
         function downloadTxt() {
-            const text = document.getElementById('playlistDisplay').innerText;
-            const element = document.createElement("a");
-            const file = new Blob([text], {type: 'text/plain'});
-            element.href = URL.createObjectURL(file);
-            element.download = "PlayList.txt";
-            document.body.appendChild(element);
-            element.click();
+            const blob = new Blob([document.getElementById('playlistDisplay').innerText], {type: 'text/plain'});
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "PlayList.txt";
+            a.click();
         }
 
         fetchLibrary();
