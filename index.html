@@ -5,8 +5,8 @@
     <title>National Request Playlist Generator</title>
     <style>
         body { font-family: sans-serif; max-width: 800px; margin: 20px auto; line-height: 1.6; padding: 20px; background: #f4f4f9; }
-        .box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #e74c3c; }
-        .status { font-size: 0.9em; color: #7f8c8d; margin-bottom: 20px; padding: 10px; background: #fdf2f2; border-radius: 4px; border: 1px solid #fab1a0; }
+        .box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #27ae60; }
+        .status { font-size: 0.9em; color: #7f8c8d; margin-bottom: 20px; padding: 10px; background: #e8f8f5; border-radius: 4px; border: 1px solid #27ae60; }
         h2 { color: #2c3e50; margin-top: 0; }
         button { background: #27ae60; color: white; border: none; padding: 12px 24px; border-radius: 4px; cursor: pointer; font-size: 1em; font-weight: bold; }
         button:disabled { background: #bdc3c7; }
@@ -17,7 +17,7 @@
 <body>
     <div class="box">
         <h2>National Request Generator</h2>
-        <div class="status" id="loadStatus">Checking Data...</div>
+        <div class="status" id="loadStatus">Finalizing Data...</div>
         
         <button id="genBtn" onclick="generatePlaylist()" disabled>Generate 1-Hour Playlist</button>
         
@@ -37,10 +37,13 @@
         const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSZf2oqinMZWPB0z9dXTfbQxsuzssny4BV5-htEB-udb0quC7a0T8W-uXHbVcF8HycL4h_XBKveNVNm/pub?gid=984873385&single=true&output=csv';
         let libraryData = [];
 
-        // This removes [ANYTHING IN BRACKETS] from a piece of text
-        function stripBrackets(str) {
+        // v13.0 Cleaner: Specifically deletes the date pattern but leaves the Gender letter
+        function cleanField(str) {
             if (!str) return "";
-            return str.replace(/\[.*?\]/g, "").trim();
+            // Delete the [25/04/2026 10:00] part but leave the rest
+            let clean = str.replace(/\[\d{1,2}\/\d{1,2}\/\d{2,4}\s\d{1,2}:\d{2}\]/g, "");
+            // If there's an empty bracket left over from messy CSVs, clean it
+            return clean.replace(/[\[\]]/g, "").trim();
         }
 
         async function fetchLibrary() {
@@ -54,17 +57,16 @@
                     if (cols.length >= 6) {
                         return {
                             pos: cols[0].trim(),
-                            // We clean the artist and title here specifically
-                            artist: stripBrackets(cols[1]),
-                            title: stripBrackets(cols[2]),
+                            artist: cleanField(cols[1]),
+                            title: cleanField(cols[2]),
                             cat: cols[3].trim().toUpperCase(),
-                            gender: stripBrackets(cols[5]) 
+                            gender: cleanField(cols[5]) // This should now leave the M/F behind!
                         };
                     }
                     return null;
                 }).filter(row => row !== null && row.artist !== "");
                 
-                document.getElementById('loadStatus').innerHTML = `Ready: ${libraryData.length} Cleaned Songs.`;
+                document.getElementById('loadStatus').innerHTML = `Success: ${libraryData.length} Cleaned Songs Ready.`;
                 document.getElementById('genBtn').disabled = false;
             } catch (err) {
                 document.getElementById('loadStatus').innerHTML = "Connection Error.";
@@ -93,7 +95,6 @@
             let out = "--- NATIONAL REQUEST PLAYLIST ---\n\n";
             list.forEach(s => {
                 let status = s.slot <= 14 ? "[STRICT]  " : "[OPTIONAL]";
-                // Re-assembling with Category, Gender, and Chart Position
                 out += `${s.slot.toString().padStart(2, '0')}. ${status} [${s.cat}] [${s.gender}] ${s.artist} - ${s.title} (Chart Position: #${s.pos})\n`;
             });
             document.getElementById('playlistDisplay').innerText = out;
