@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>National Request Generator v17.0</title>
+    <title>National Request Playlist Generator</title>
     <style>
         body { font-family: sans-serif; max-width: 800px; margin: 20px auto; line-height: 1.6; padding: 20px; background: #f4f4f9; }
         .box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #2c3e50; }
@@ -16,8 +16,8 @@
 </head>
 <body>
     <div class="box">
-        <h2>National Request Generator <small style="font-size:0.5em; color:#2c3e50;">v17.0 (No Gender)</small></h2>
-        <div class="status" id="loadStatus">Awaiting Data...</div>
+        <h2>National Request Generator</h2>
+        <div id="loadStatus" class="status">Connecting to Database...</div>
         
         <button id="genBtn" onclick="generatePlaylist()" disabled>Generate Clean Playlist</button>
         
@@ -40,7 +40,6 @@
         function fixArtist(name) {
             if (!name) return "";
             let n = name.trim();
-            // Automatically restores "The" to common bands if the spreadsheet stripped them
             const needsThe = ["Beatles", "Carpenters", "Animals", "Kinks", "Temptations", "Killers", "Pogues", "Righteous Brothers"];
             if (needsThe.includes(n)) return "The " + n;
             return n;
@@ -65,10 +64,10 @@
                     return null;
                 }).filter(row => row !== null && row.artist !== "");
                 
-                document.getElementById('loadStatus').innerHTML = `v17.0 Ready: ${libraryData.length} items loaded.`;
+                document.getElementById('loadStatus').innerHTML = `Library Synced: ${libraryData.length} items ready.`;
                 document.getElementById('genBtn').disabled = false;
             } catch (err) {
-                document.getElementById('loadStatus').innerHTML = "Sync Error.";
+                document.getElementById('loadStatus').innerHTML = "Unable to load database.";
             }
         }
 
@@ -94,7 +93,6 @@
             let out = "--- NATIONAL REQUEST PLAYLIST ---\n\n";
             list.forEach(s => {
                 let status = s.slot <= 14 ? "[STRICT]  " : "[OPTIONAL]";
-                // Gender bracket removed entirely as requested
                 out += `${s.slot.toString().padStart(2, '0')}. ${status} [${s.cat}] ${s.artist} - ${s.title} (Chart Position: #${s.pos})\n`;
             });
             document.getElementById('playlistDisplay').innerText = out;
