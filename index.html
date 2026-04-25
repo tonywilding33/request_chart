@@ -45,10 +45,10 @@
 
         async function fetchLibrary() {
             try {
-                const response = await fetch(SHEET_CSV_URL);
+                // Added a cache-buster to the URL to force a fresh fetch from Google
+                const response = await fetch(SHEET_CSV_URL + '&cb=' + Date.now());
                 const csvText = await response.text();
                 const lines = csvText.split(/\r?\n/);
-                // Mapping all 7 columns: 0:TY, 1:Artist, 2:Title, 3:Cat, 4:LY, 5:Gender, 6:Score
                 libraryData = lines.slice(1)
                     .map(line => line.split(','))
                     .filter(cols => cols.length >= 7 && cols[1] !== "");
@@ -111,7 +111,7 @@
             generatedText = "--- NATIONAL REQUEST PLAYLIST ---\n\n";
             list.forEach(s => {
                 let status = s.slot <= 14 ? "[STRICT]  " : "[OPTIONAL]";
-                // Labels updated to "Chart Position" as requested
+                // Change made here: "Pos:" changed to "Chart Position:"
                 generatedText += `${s.slot.toString().padStart(2, '0')}. ${status} [${s.cat}] [${s.gender}] ${s.artist} - ${s.title} (Chart Position: #${s.pos})\n`;
             });
 
