@@ -23,7 +23,7 @@
         <h2>National Request Playlist Generator</h2>
         <div class="status" id="loadStatus"><span class="loader"></span>Connecting to Database...</div>
         
-        <button id="genBtn" onclick="generatePlaylist()" disabled>Generate 1-Hour Playlist</button>
+        <button id="genBtn" onclick="generateNationalPlaylist()" disabled>Generate 1-Hour Playlist</button>
         
         <div id="outputArea" style="display:none;">
             <h3>Generated Playlist</h3>
@@ -38,17 +38,24 @@
     </div>
 
     <script>
+        // Unique URL parameter ensures Google doesn't serve a cached CSV
         const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSZf2oqinMZWPB0z9dXTfbQxsuzssny4BV5-htEB-udb0quC7a0T8W-uXHbVcF8HycL4h_XBKveNVNm/pub?gid=984873385&single=true&output=csv';
         
         let libraryData = [];
         let generatedText = "";
 
+        // Nuclear Scrubber: Targeted specifically at [DD/MM/YYYY HH:MM] patterns
+        function scrubTimestamp(str) {
+            if (!str) return "";
+            return str.replace(/\[\d{1,2}\/\d{1,2}\/\d{2,4}\s\d{1,2}:\d{2}\]\s*/g, "").trim();
+        }
+
         async function fetchLibrary() {
             try {
-                // Added a cache-buster to the URL to force a fresh fetch from Google
-                const response = await fetch(SHEET_CSV_URL + '&cb=' + Date.now());
+                const response = await fetch(SHEET_CSV_URL + '&cache_bust=' + Date.now());
                 const csvText = await response.text();
                 const lines = csvText.split(/\r?\n/);
+                
                 libraryData = lines.slice(1)
                     .map(line => line.split(','))
                     .filter(cols => cols.length >= 7 && cols[1] !== "");
@@ -60,7 +67,8 @@
             }
         }
 
-        function generatePlaylist() {
+        // Renamed function to force browser to re-read the script
+        function generateNationalPlaylist() {
             const pattern = ["A", "B", "A", "C"];
             let playlist = [];
             let usedArtists = new Set();
@@ -69,9 +77,10 @@
             for (let slot = 1; slot <= 18; slot++) {
                 let category = pattern[(slot - 1) % 4];
                 
+                // Scrub names immediately during filtering
                 let pool = libraryData.filter(r => 
                     r[3].trim().toUpperCase() === category && 
-                    !usedArtists.has(r[1].trim())
+                    !usedArtists.has(scrubTimestamp(r[1]))
                 );
                 
                 let genderPool = pool.filter(r => r[5].trim().toUpperCase() !== lastGender);
@@ -94,13 +103,13 @@
                     playlist.push({
                         slot: slot,
                         pos: pick[0].trim(),
-                        artist: pick[1].trim(),
-                        title: pick[2].trim(),
+                        artist: scrubTimestamp(pick[1]),
+                        title: scrubTimestamp(pick[2]),
                         cat: category,
                         gender: pick[5].trim().toUpperCase()
                     });
                     
-                    usedArtists.add(pick[1].trim());
+                    usedArtists.add(scrubTimestamp(pick[1]));
                     lastGender = pick[5].trim().toUpperCase();
                 }
             }
@@ -111,7 +120,7 @@
             generatedText = "--- NATIONAL REQUEST PLAYLIST ---\n\n";
             list.forEach(s => {
                 let status = s.slot <= 14 ? "[STRICT]  " : "[OPTIONAL]";
-                // Change made here: "Pos:" changed to "Chart Position:"
+                // Explicitly changed label to "Chart Position"
                 generatedText += `${s.slot.toString().padStart(2, '0')}. ${status} [${s.cat}] [${s.gender}] ${s.artist} - ${s.title} (Chart Position: #${s.pos})\n`;
             });
 
